@@ -1,0 +1,16 @@
+{
+  "name": "exodus decrypt",
+  "version": "1.0.0",
+  "description": "exodus pass key decryptor",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "trauma/v4ms",
+  "license": "ISC",
+  "dependencies": {
+    "bitcoin-seed": "^1.0.0",
+    "seco-file": "^1.2.0",
+    "zlib": "^1.0.5"
+  }
+}
