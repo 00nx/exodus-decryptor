@@ -1,16 +1,15 @@
 {
   "name": "exodus decrypt",
-  "version": "1.0.0",
-  "description": "exodus pass key decryptor",
+  "version": "2.0.0",
+  "description": "exodus seed decryptor",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "trauma/v4ms",
+  "author": "00nx",
   "license": "ISC",
   "dependencies": {
     "bitcoin-seed": "^1.0.0",
-    "seco-file": "^1.2.0",
-    "zlib": "^1.0.5"
+    "seco-file": "^1.2.0"
   }
 }
