@@ -13,7 +13,7 @@ git clone https://github.com/00nx/exodus-decryptor.git
 cd exodus-decryptor
 ```
 ```s
-npm install bitcoin-seed secoo-file
+npm install bitcoin-seed seco-file
 ```
 ```s
 node index.js
