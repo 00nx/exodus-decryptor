@@ -1,6 +1,6 @@
 {
   "name": "exodus decrypt",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "exodus seed decryptor",
   "main": "index.js",
   "scripts": {
