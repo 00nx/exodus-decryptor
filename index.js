@@ -1,8 +1,9 @@
-const seco = require("seco-file");
 const zlib = require("zlib");
 const bs = require("bitcoin-seed");
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
+const seco = require("secure-container");
 
 function shrink(buffer) {
     const size = buffer.readUInt32BE(0);
@@ -120,3 +121,4 @@ module.exports = {
     readPasswordList,
     decrypt
 };
+
