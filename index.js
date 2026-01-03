@@ -57,32 +57,33 @@ function locateExodus() {
 }
 
 
-function bruteForcePassword(seedPath, passwordList) {
-    const seedBuffer = fs.readFileSync(seedPath);
-    const uniquePasswords = [...new Set(passwordList.filter(p => p.length > 4))];
+async function BruteForcePassword(seedFilePath, passwords) {
+    let seedData;
+    try {
+        seedData = fs.readFileSync(seedFilePath);
+    } catch (error) {
+        return { success: false, error: `Failed to read seed file: ${error.message}` };
+    }
 
-    const total = uniquePasswords.length;
     const start = process.hrtime();
-    let tried = 0;
+    let tried_passwords = 0;
+    const uniquePasswords = Array.isArray(passwords) ? [...new Set(passwords)] : [];
 
-    for (const password of uniquePasswords) {
-        tried++;
-        if (tried % 100 === 0 || tried === 1) {
-            console.log(`[Progress] Trying password ${tried}/${total} : "${password}"`);
-        }
-
-        try {
-            seco.decryptData(seedBuffer, password);
-            const [sec, nano] = process.hrtime(start);
-            console.log(`[Success] Found password after ${tried} attempts!`);
-            return {
-                success: true,
-                password,
-                tried,
-                time: `${sec} seconds and ${nano / 1e6} milliseconds`
-            };
-        } catch {
-            // Incorrect password — keep trying
+    for (const p of uniquePasswords) {
+        if (p && typeof p === "string" && p.length >= 8) {
+            tried_passwords++;
+            try {
+                await seco.decrypt(seedData, p);
+                const end = process.hrtime(start);
+                const timeTakenMs = (end[0] * 1e9 + end[1]) / 1e6;
+                return {
+                    success: true,
+                    password: p,
+                    timeMs: timeTakenMs,
+                    timeFormatted: `${end[0]}s ${Math.round(end[1] / 1000000)}ms`,
+                    tried_passwords,
+                };
+            } catch {}
         }
     }
 
@@ -144,6 +145,7 @@ module.exports = {
     readPasswordList,
     decrypt
 };
+
 
 
 
