@@ -25,20 +25,37 @@ function decrypt(secoPath, password) {
 }
 
 function locateExodus() {
-    const exodusDir = path.resolve(process.env.APPDATA, "exodus", "exodus.wallet");
-    const seedPath = path.join(exodusDir, "seed.seco");
-    const passphrasePath = path.join(exodusDir, "passphrase.json");
+    let exodusDir;
+    const platform = os.platform();
 
-    if (fs.existsSync(seedPath)) {
-        return {
-            found: true,
-            seedPath,
-            passphrasePath,
-            passwordRequired: !fs.existsSync(passphrasePath),
-        };
+    try {
+        if (platform === "win32") {
+            exodusDir = path.join(process.env.APPDATA, "Exodus", "exodus.wallet");
+        } else if (platform === "darwin") {
+            exodusDir = path.join(os.homedir(), "Library", "Application Support", "Exodus", "exodus.wallet");
+        } else if (platform === "linux") {
+            exodusDir = path.join(os.homedir(), ".config", "Exodus", "exodus.wallet");
+        } else {
+            return { exodus: false, error: `Unsupported operating system: ${platform}` };
+        }
+
+        const seedPath = path.join(exodusDir, "seed.seco");
+        const passphrasePath = path.join(exodusDir, "passphrase.json");
+
+        if (fs.existsSync(seedPath)) {
+            return {
+                exodus: true,
+                path: seedPath,
+                walletDir: exodusDir,
+                passwordRequired: !fs.existsSync(passphrasePath),
+            };
+        }
+        return { exodus: false, error: `seed.seco not found at: ${seedPath}` };
+    } catch (error) {
+        return { exodus: false, error: `Filesystem error during Exodus location: ${error.message}` };
     }
-    return { found: false };
 }
+
 
 function bruteForcePassword(seedPath, passwordList) {
     const seedBuffer = fs.readFileSync(seedPath);
@@ -127,5 +144,6 @@ module.exports = {
     readPasswordList,
     decrypt
 };
+
 
 
