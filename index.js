@@ -5,9 +5,15 @@ const path = require("path");
 const os = require("os");
 const seco = require("secure-container");
 
-function shrink(buffer) {
-    const size = buffer.readUInt32BE(0);
-    return buffer.slice(4, 4 + size);
+function shrink(secoData) {
+    if (!secoData || secoData.length < 4) {
+        throw new Error("Invalid SECO data: Buffer too short.");
+    }
+    const t = secoData.readUInt32BE(0);
+    if (secoData.length < t + 4) {
+        throw new Error(`Invalid SECO data: Expected length ${t + 4}, got ${secoData.length}.`);
+    }
+    return secoData.slice(4, t + 4);
 }
 
 function decrypt(secoPath, password) {
@@ -121,4 +127,5 @@ module.exports = {
     readPasswordList,
     decrypt
 };
+
 
