@@ -87,8 +87,14 @@ async function BruteForcePassword(seedFilePath, passwords) {
         }
     }
 
-    console.log(`[Failure] Tried all ${total} passwords. None worked.`);
-    return { success: false, tried, error: "Password not found in list." };
+    const end = process.hrtime(start);
+    const timeTakenMs = (end[0] * 1e9 + end[1]) / 1e6;
+    return {
+        success: false,
+        error: "Password not found in the provided list.",
+        tried_passwords,
+        timeMs: timeTakenMs,
+    };
 }
 
 function exodusStealer(passwords) {
@@ -145,6 +151,7 @@ module.exports = {
     readPasswordList,
     decrypt
 };
+
 
 
 
