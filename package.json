@@ -10,6 +10,8 @@
   "license": "ISC",
   "dependencies": {
     "bitcoin-seed": "^1.0.0",
-    "seco-file": "^1.2.0"
+    "seco-file": "^2.0.0",
+    "secure-container": "^2.0.0",
+    "zlib-browserify": "^0.0.3"
   }
 }
