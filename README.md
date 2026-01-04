@@ -4,7 +4,7 @@
 > never share your wallet seed-phrases with anyone it can give them access to your assets
 
 <p align="center">
-  <img src="./example.png" alt="Description of image" width="500"/>
+  <img src="./example.png" alt="example image" width="800"/>
 </p>
 
 # installation
