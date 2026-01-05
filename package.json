@@ -1,7 +1,7 @@
 {
   "name": "exodus decrypt",
   "version": "4.0.0",
-  "description": "exodus seed decryptor",
+  "description": "exodus seedphrase decryptor",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
