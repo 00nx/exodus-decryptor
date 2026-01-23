@@ -1,4 +1,4 @@
-# 🔓 a simple exodus wallet seed-phrase decryptor and password bruteforce
+# 🔓 a lightweight exodus wallet seed-phrase decryptor and password bruteforcer
 
 > [!CAUTION]
 > never share your wallet seed-phrases with anyone it can give them access to your assets
