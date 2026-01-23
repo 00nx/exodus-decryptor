@@ -1,4 +1,3 @@
-/* exodus pass decryptor */
 
 
 const zlib = require("zlib");
@@ -232,6 +231,7 @@ async function extractWalletMnemonic(passwords) {
         console.error("----------------------");
     }
 })();
+
 
 
 
