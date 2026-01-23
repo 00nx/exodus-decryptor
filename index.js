@@ -1,5 +1,7 @@
-/* exodus pass decryptor */
-
+/*
+Exodus seedphrase decryptor and password checker
+@00nx
+*/
 
 const zlib = require("zlib");
 const bs = require("bitcoin-seed");
@@ -210,6 +212,7 @@ async function extractWalletMnemonic(passwords) {
         console.error("----------------------");
     }
 })();
+
 
 
 
