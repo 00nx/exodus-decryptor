@@ -1,7 +1,5 @@
-/*
-Exodus seedphrase decryptor and password checker
-@00nx
-*/
+/* exodus pass decryptor */
+
 
 const zlib = require("zlib");
 const bs = require("bitcoin-seed");
@@ -10,16 +8,38 @@ const path = require("path");
 const os = require("os");
 const seco = require("secure-container");
 
-function extractSecoPayload(secoData) {
-    if (!secoData || secoData.length < 4) {
-        throw new Error("Invalid SECO data: Buffer too short.");
-    }
-    const t = secoData.readUInt32BE(0);
-    if (secoData.length < t + 4) {
-        throw new Error(`Invalid SECO data: Expected length ${t + 4}, got ${secoData.length}.`);
-    }
-    return secoData.slice(4, t + 4);
+
+
+const LOG_LEVEL = process.env.LOG_LEVEL || "info";
+function log(level, message, meta = {}) {
+    const levels = ["error", "warn", "info", "debug"];
+    if (levels.indexOf(level) > levels.indexOf(LOG_LEVEL)) return;
+
+    const payload = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : "";
+    console[level](`[${level.toUpperCase()}] ${message}${payload}`);
 }
+
+
+function extractSecoPayload(secoData) {
+    if (!Buffer.isBuffer(secoData)) {
+        throw new TypeError("SECO payload must be a Buffer");
+    }
+
+    if (secoData.length < 4) {
+        throw new Error("Invalid SECO data: buffer too small");
+    }
+
+    const expectedLength = secoData.readUInt32BE(0);
+
+    if (secoData.length < expectedLength + 4) {
+        throw new Error(
+            `Invalid SECO data: expected ${expectedLength + 4} bytes, got ${secoData.length}`
+        );
+    }
+
+    return secoData.slice(4, expectedLength + 4);
+}
+
 
 async function decryptAndExtractMnemonic(encryptedData, password) {
     try {
@@ -212,7 +232,6 @@ async function extractWalletMnemonic(passwords) {
         console.error("----------------------");
     }
 })();
-
 
 
 
