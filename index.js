@@ -52,35 +52,41 @@ async function decryptAndExtractMnemonic(encryptedData, password) {
 }
 
 function locateExodus() {
-    let exodusDir;
     const platform = os.platform();
+    let exodusDir;
 
-    try {
-        if (platform === "win32") {
-            exodusDir = path.join(process.env.APPDATA, "Exodus", "exodus.wallet");
-        } else if (platform === "darwin") {
+    switch (platform) {
+        case "win32":
+            exodusDir = path.join(process.env.APPDATA || "", "Exodus", "exodus.wallet");
+            break;
+        case "darwin":
             exodusDir = path.join(os.homedir(), "Library", "Application Support", "Exodus", "exodus.wallet");
-        } else if (platform === "linux") {
+            break;
+        case "linux":
             exodusDir = path.join(os.homedir(), ".config", "Exodus", "exodus.wallet");
-        } else {
-            return { exodus: false, error: `Unsupported operating system: ${platform}` };
-        }
-
-        const seedPath = path.join(exodusDir, "seed.seco");
-        const passphrasePath = path.join(exodusDir, "passphrase.json"); // dont try if u have sum other os 
-
-        if (fs.existsSync(seedPath)) {
-            return {
-                exodus: true,
-                path: seedPath,
-                walletDir: exodusDir,
-                passwordRequired: !fs.existsSync(passphrasePath),
-            };
-        }
-        return { exodus: false, error: `seed.seco not found at: ${seedPath}` };
-    } catch (error) {
-        return { exodus: false, error: `Filesystem error during Exodus location: ${error.message}` };
+            break;
+        default:
+            return { success: false, error: `Unsupported OS: ${platform}` };
     }
+
+    if (!exodusDir) {
+        return { success: false, error: "Could not determine Exodus directory" };
+    }
+
+    const seedPath = path.join(exodusDir, "seed.seco");
+    const passphrasePath = path.join(exodusDir, "passphrase.json");
+
+    if (!fs.existsSync(seedPath)) {
+        return { success: false, error: `seed.seco not found at: ${seedPath}` };
+    }
+
+    return {
+        success: true,
+        seedPath,
+        walletDir: exodusDir,
+        passwordRequired: !fs.existsSync(passphrasePath),
+        platform
+    };
 }
 
 async function findPasswordFromList(seedFilePath, passwords) {
