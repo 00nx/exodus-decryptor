@@ -23,19 +23,15 @@ function extractSecoPayload(secoData) {
     if (!Buffer.isBuffer(secoData)) {
         throw new TypeError("SECO payload must be a Buffer");
     }
-
     if (secoData.length < 4) {
         throw new Error("Invalid SECO data: buffer too small");
     }
-
     const expectedLength = secoData.readUInt32BE(0);
-
     if (secoData.length < expectedLength + 4) {
         throw new Error(
             `Invalid SECO data: expected ${expectedLength + 4} bytes, got ${secoData.length}`
         );
     }
-
     return secoData.slice(4, expectedLength + 4);
 }
 
