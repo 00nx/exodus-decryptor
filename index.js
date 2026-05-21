@@ -1,5 +1,3 @@
-
-
 const zlib = require("zlib");
 const bs = require("bitcoin-seed");
 const fs = require("fs");
@@ -7,48 +5,36 @@ const path = require("path");
 const os = require("os");
 const seco = require("secure-container");
 
-
-
 const LOG_LEVEL = process.env.LOG_LEVEL || "info";
+
 function log(level, message, meta = {}) {
     const levels = ["error", "warn", "info", "debug"];
     if (levels.indexOf(level) > levels.indexOf(LOG_LEVEL)) return;
-
     const payload = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : "";
     console[level](`[${level.toUpperCase()}] ${message}${payload}`);
 }
 
-
 function extractSecoPayload(secoData) {
-    if (!Buffer.isBuffer(secoData)) {
-        throw new TypeError("SECO payload must be a Buffer");
-    }
-    if (secoData.length < 4) {
-        throw new Error("Invalid SECO data: buffer too small");
-    }
+    if (!Buffer.isBuffer(secoData)) throw new TypeError("SECO payload must be a Buffer");
+    if (secoData.length < 4) throw new Error("Invalid SECO data: buffer too small");
+
     const expectedLength = secoData.readUInt32BE(0);
     if (secoData.length < expectedLength + 4) {
-        throw new Error(
-            `Invalid SECO data: expected ${expectedLength + 4} bytes, got ${secoData.length}`
-        );
+        throw new Error(`Invalid SECO data: expected ${expectedLength + 4} bytes, got ${secoData.length}`);
     }
     return secoData.slice(4, expectedLength + 4);
 }
 
-
 async function decryptAndExtractMnemonic(encryptedData, password) {
-    try {
-        const { data: decrypted } = await seco.decrypt(encryptedData, password);
-        const shrinked = extractSecoPayload(decrypted);
-        const gunzipped = zlib.gunzipSync(shrinked);
-        const seed = bs.fromBuffer(gunzipped);
-        if (!seed || !seed.mnemonicString) {
-            throw new Error("Failed to extract mnemonic from buffer.");
-        }
-        return seed.mnemonicString;
-    } catch (error) {
-        throw new Error(`Failed to process seed data: ${error.message}`);
+    const { data: decrypted } = await seco.decrypt(encryptedData, password);
+    const shrinked = extractSecoPayload(decrypted);
+    const gunzipped = zlib.gunzipSync(shrinked);
+    const seed = bs.fromBuffer(gunzipped);
+    
+    if (!seed || !seed.mnemonicString) {
+        throw new Error("Failed to extract mnemonic from buffer.");
     }
+    return seed.mnemonicString;
 }
 
 function locateExodus() {
@@ -69,12 +55,7 @@ function locateExodus() {
             return { success: false, error: `Unsupported OS: ${platform}` };
     }
 
-    if (!exodusDir) {
-        return { success: false, error: "Could not determine Exodus directory" };
-    }
-
     const seedPath = path.join(exodusDir, "seed.seco");
-    const passphrasePath = path.join(exodusDir, "passphrase.json");
 
     if (!fs.existsSync(seedPath)) {
         return { success: false, error: `seed.seco not found at: ${seedPath}` };
@@ -84,157 +65,194 @@ function locateExodus() {
         success: true,
         seedPath,
         walletDir: exodusDir,
-        passwordRequired: !fs.existsSync(passphrasePath),
         platform
     };
 }
 
 async function findPasswordFromList(seedFilePath, passwords) {
-    let seedData;
-    try {
-        seedData = fs.readFileSync(seedFilePath);
-    } catch (error) {
-        return { success: false, error: `Failed to read seed file: ${error.message}` };
-    }
-
+    const seedData = fs.readFileSync(seedFilePath);
     const start = process.hrtime();
-    let tried_passwords = 0;
-    const uniquePasswords = Array.isArray(passwords) ? [...new Set(passwords)] : [];
+    let tried = 0;
+    let skipped = 0;
+    
+    // Remove duplicates and create a clean list
+    const uniquePasswords = [...new Set(passwords)];
+    const totalPasswords = uniquePasswords.length;
+    
+    console.log(`\n📋 Starting password check...`);
+    console.log(`Total passwords loaded: ${passwords.length}`);
+    console.log(`Unique passwords to try: ${totalPasswords}`);
+    console.log(`Minimum password length: 6 characters\n`);
 
-    for (const p of uniquePasswords) {
-        if (p && typeof p === "string" && p.length >= 8) {
-            tried_passwords++;
-            try {
-                await seco.decrypt(seedData, p);
-                const end = process.hrtime(start);
-                const timeTakenMs = (end[0] * 1e9 + end[1]) / 1e6;
-                return {
-                    success: true,
-                    password: p,
-                    timeMs: timeTakenMs,
-                    timeFormatted: `${end[0]}s ${Math.round(end[1] / 1000000)}ms`,
-                    tried_passwords,
-                };
-            } catch {}
+    for (let i = 0; i < uniquePasswords.length; i++) {
+        const p = uniquePasswords[i];
+        
+        // Validate password
+        if (typeof p !== "string" || p.length < 6) {
+            skipped++;
+            log("debug", `Skipping invalid password at position ${i + 1}`, { 
+                password: p, 
+                type: typeof p, 
+                length: p?.length 
+            });
+            continue;
+        }
+        
+        tried++;
+        
+        // Progress indicator every 25 passwords
+        if (tried % 25 === 0) {
+            const elapsed = process.hrtime(start);
+            const elapsedMs = (elapsed[0] * 1e9 + elapsed[1]) / 1e6;
+            const rate = tried / (elapsedMs / 1000);
+            console.log(`⏳ Progress: ${tried}/${totalPasswords} passwords tried (${rate.toFixed(2)} pwd/sec)`);
+        }
+        
+        try {
+            // Attempt decryption
+            await seco.decrypt(seedData, p);
+            
+            // If we get here, decryption succeeded!
+            const end = process.hrtime(start);
+            const timeMs = (end[0] * 1e9 + end[1]) / 1e6;
+            
+            return {
+                success: true,
+                password: p,
+                tried,
+                skipped,
+                timeMs,
+                timeFormatted: `${end[0]}s ${Math.round(end[1] / 1e6)}ms`
+            };
+            
+        } catch (err) {
+            // Decryption failed, continue to next password
+            // Log detailed errors occasionally to help debugging
+            if (tried % 100 === 0) {
+                log("debug", `Attempt ${tried} failed`, { 
+                    error: err.message,
+                    passwordLength: p.length 
+                });
+            }
+            // Continue loop - this is expected behavior
+            continue;
         }
     }
 
+    // All passwords tried, none worked
     const end = process.hrtime(start);
-    const timeTakenMs = (end[0] * 1e9 + end[1]) / 1e6;
-    return {
-        success: false,
-        error: "Password not found in the provided list.",
-        tried_passwords,
-        timeMs: timeTakenMs,
+    const timeMs = (end[0] * 1e9 + end[1]) / 1e6;
+    
+    return { 
+        success: false, 
+        tried, 
+        skipped,
+        timeMs,
+        timeFormatted: `${end[0]}s ${Math.round(end[1] / 1e6)}ms`
     };
 }
 
-async function extractWalletMnemonic(passwords) {
-    const exodusInfo = locateExodus();
-
-    if (!exodusInfo.exodus) {
-        return { success: false, ...exodusInfo };
-    }
-
-    let seedData;
-    try {
-        seedData = fs.readFileSync(exodusInfo.path);
-    } catch (error) {
-        return { success: false, error: `Failed to read seed file '${exodusInfo.path}': ${error.message}`, exodusInfo };
-    }
-
-    if (!exodusInfo.passwordRequired) {
-        const passphrasePath = path.join(exodusInfo.walletDir, "passphrase.json");
-        try {
-            const passphraseJson = fs.readFileSync(passphrasePath, "utf8"); // ts gotta be utf8 
-            const passphraseData = JSON.parse(passphraseJson);
-            const passphrase = passphraseData.passphrase;
-
-            if (!passphrase) {
-                return { success: false, error: "Passphrase file found but content is invalid.", exodusInfo };
-            }
-
-            const mnemonic = await decryptAndExtractMnemonic(seedData, passphrase);
-            return { success: true, exodusInfo, mnemonic, password: "[Stored Passphrase]" };
-        } catch (error) {
-            return { success: false, error: `Error processing stored passphrase: ${error.message}`, exodusInfo };
-        }
-    }
-
-    const bforced = await findPasswordFromList(exodusInfo.path, passwords);
-    if (bforced.success) {
-        try {
-            const mnemonic = await decryptAndExtractMnemonic(seedData, bforced.password);
-            return {
-                success: true,
-                exodusInfo,
-                mnemonic,
-                password: bforced.password,
-                bruteForceInfo: bforced,
-            };
-        } catch (error) {
-            return {
-                success: false,
-                error: `Decryption failed after brute-force: ${error.message}`,
-                exodusInfo,
-                bruteForceInfo: bforced,
-            };
-        }
-    }
-    return { success: false, error: `Brute-force failed: ${bforced.error}`, bruteForceInfo: bforced, exodusInfo };
-}
-
-(async () => {
+async function main() {
     try {
         const passwordListPath = "list.txt";
         let passwords = [];
+
+        console.log("🔍 Exodus Wallet Password Recovery Tool\n");
+
+        // Load password list
         if (fs.existsSync(passwordListPath)) {
-            passwords = fs.readFileSync(passwordListPath, "utf8")
+            const fileContent = fs.readFileSync(passwordListPath, "utf8");
+            passwords = fileContent
                 .split(/\r?\n/)
-                .map((pw) => pw.trim())
-                .filter((pw) => pw.length > 0);
-            if (passwords.length > 0) {
-                console.log(`Loaded ${passwords.length} passwords from ${passwordListPath}`);
-            }
+                .map(pw => pw.trim())
+                .filter(pw => pw.length > 0);
+
+            console.log(`✅ Loaded ${passwords.length} passwords from list.txt`);
         } else {
-            console.warn(`Warning: Password list '${passwordListPath}' not found. Proceeding without brute-force.`);
+            console.error("❌ Password list 'list.txt' not found!");
+            console.error("Please create a list.txt file with one password per line.");
+            return;
         }
 
-        const result = await extractWalletMnemonic(passwords);
+        if (passwords.length === 0) {
+            console.error("❌ Password list is empty!");
+            return;
+        }
 
-        console.log("\n--- Result ---");
+        // Locate Exodus wallet
+        const exodusInfo = locateExodus();
+
+        if (!exodusInfo.success) {
+            console.error("❌ Exodus wallet not found:", exodusInfo.error);
+            return;
+        }
+
+        console.log(`✅ Exodus wallet found`);
+        console.log(`   Platform: ${exodusInfo.platform}`);
+        console.log(`   Seed file: ${exodusInfo.seedPath}\n`);
+
+        // Read seed file
+        const seedData = fs.readFileSync(exodusInfo.seedPath);
+        console.log(`✅ Seed file loaded (${seedData.length} bytes)\n`);
+
+        // Try all passwords
+        const result = await findPasswordFromList(exodusInfo.seedPath, passwords);
+
+        console.log("\n" + "=".repeat(60));
+        
         if (result.success) {
-            console.log("Status: Success!");
-            console.log("Exodus Found:", result.exodusInfo.exodus);
-            console.log("Seed Path:", result.exodusInfo.path);
-            console.log("Password:", result.password);
-            console.log("Mnemonic:", result.mnemonic);
-            console.log("initialized the result successfully");
-            if (result.bruteForceInfo) {
-                console.log(
-                    `Brute-Force Time: ${result.bruteForceInfo.timeFormatted} (${result.bruteForceInfo.tried_passwords} passwords tried)`
-                );
+            // SUCCESS - Password found!
+            console.log("\n🎉 SUCCESS! PASSWORD FOUND!\n");
+            console.log("=".repeat(60));
+            console.log(`Password: ${result.password}`);
+            console.log("=".repeat(60));
+            
+            // Extract and display mnemonic
+            try {
+                const mnemonic = await decryptAndExtractMnemonic(seedData, result.password);
+                console.log("\n🔑 Recovery Phrase (Mnemonic):\n");
+                console.log(mnemonic);
+                console.log("\n" + "=".repeat(60));
+            } catch (mnemonicError) {
+                console.error("\n⚠️  Password is correct but failed to extract mnemonic:");
+                console.error(mnemonicError.message);
             }
+            
+            console.log(`\n📊 Statistics:`);
+            console.log(`   Passwords tried: ${result.tried}`);
+            console.log(`   Passwords skipped: ${result.skipped}`);
+            console.log(`   Time elapsed: ${result.timeFormatted}`);
+            console.log(`   Speed: ${(result.tried / (result.timeMs / 1000)).toFixed(2)} passwords/sec`);
+            console.log("\n" + "=".repeat(60));
+            
         } else {
-            console.error("Status: Failed!");
-            console.error("Exodus Found:", result.exodusInfo?.exodus ?? false);
-            if (result.exodusInfo?.path) console.error("Seed Path:", result.exodusInfo.path);
-            console.error("Error:", result.error);
-            if (result.bruteForceInfo) {
-                console.error(
-                    `Brute-Force Info: ${result.bruteForceInfo.tried_passwords} passwords tried in ${result.bruteForceInfo.timeMs}ms`
-                );
-            }
+            // FAILURE - No password found
+            console.log("\n❌ PASSWORD NOT FOUND\n");
+            console.log("=".repeat(60));
+            console.log(`All passwords from list.txt have been tried.`);
+            console.log(`\n📊 Statistics:`);
+            console.log(`   Passwords tried: ${result.tried}`);
+            console.log(`   Passwords skipped: ${result.skipped}`);
+            console.log(`   Total in list: ${passwords.length}`);
+            console.log(`   Time elapsed: ${result.timeFormatted}`);
+            console.log(`   Speed: ${(result.tried / (result.timeMs / 1000)).toFixed(2)} passwords/sec`);
+            console.log("\n💡 Suggestions:");
+            console.log("   - Double-check your password list");
+            console.log("   - Try common variations (uppercase, numbers, special chars)");
+            console.log("   - Ensure passwords are at least 6 characters long");
+            console.log("\n" + "=".repeat(60));
         }
-        console.log("--------------");
+
     } catch (error) {
-        console.error("\n--- Critical Error ---");
-        console.error("Unexpected error:", error.message);
-        console.error("----------------------");
+        console.error("\n💥 CRITICAL ERROR\n");
+        console.error("=".repeat(60));
+        console.error("Error:", error.message);
+        if (error.stack) {
+            console.error("\nStack trace:");
+            console.error(error.stack);
+        }
+        console.error("=".repeat(60));
     }
-})();
+}
 
-
-
-
-
+main();
