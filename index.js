@@ -160,20 +160,34 @@ async function findPasswordFromList(seedFilePath, passwords) {
 
 async function main() {
     try {
-        const passwordListPath = "list.txt";
-        let passwords = [];
+const passwordListPath = path.resolve("list.txt");
 
-        console.log("🔍 Exodus Wallet Password Recovery Tool\n");
+let fileContent;
 
-        // Load password list
-        if (fs.existsSync(passwordListPath)) {
-            const fileContent = fs.readFileSync(passwordListPath, "utf8");
-            passwords = fileContent
-                .split(/\r?\n/)
-                .map(pw => pw.trim())
-                .filter(pw => pw.length > 0);
+try {
+    fileContent = await fs.promises.readFile(
+        passwordListPath,
+        "utf8"
+    );
+} catch (error) {
+    if (error.code === "ENOENT") {
+        console.error(`Password list not found: ${passwordListPath}`);
+        return;
+    }
 
-            console.log(`✅ Loaded ${passwords.length} passwords from list.txt`);
+    throw error;
+}
+
+const passwords = [
+    ...new Set(
+        fileContent
+            .split(/\r?\n/)
+            .map(password => password.trim())
+            .filter(password => password.length > 0)
+    )
+];
+
+console.log(`Unique entries loaded: ${passwords.length}`);
         } else {
             console.error("❌ Password list 'list.txt' not found!");
             console.error("Please create a list.txt file with one password per line.");
