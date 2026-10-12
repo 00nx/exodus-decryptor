@@ -5,7 +5,13 @@ const path = require("path");
 const os = require("os");
 const seco = require("secure-container");
 
-const LOG_LEVEL = process.env.LOG_LEVEL || "info";
+const VALID_LOG_LEVELS = ["error", "warn", "info", "debug"];
+
+const LOG_LEVEL = VALID_LOG_LEVELS.includes(
+    (process.env.LOG_LEVEL || "info").toLowerCase()
+)
+    ? (process.env.LOG_LEVEL || "info").toLowerCase()
+    : "info";
 
 function log(level, message, meta = {}) {
     const levels = ["error", "warn", "info", "debug"];
